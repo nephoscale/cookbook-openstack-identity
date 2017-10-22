@@ -48,4 +48,12 @@ if defined?(ChefSpec)
       :create_ec2_credentials,
       resource_name)
   end
+
+  # DO-101
+  def create_domain_openstack_identity_register(resource_name)
+    ChefSpec::Matchers::ResourceMatcher.new(
+      :openstack_identity_register,
+      :create_domain,
+      resource_name)
+  end
 end

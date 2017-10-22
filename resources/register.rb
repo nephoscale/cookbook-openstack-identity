@@ -18,7 +18,8 @@
 # limitations under the License.
 #
 
-actions :create_service, :create_endpoint, :create_tenant, :create_user, :create_role, :grant_role, :create_ec2_credentials
+# DO-101. add :create_domain
+actions :create_service, :create_endpoint, :create_tenant, :create_user, :create_role, :grant_role, :create_ec2_credentials, :create_domain
 
 # In earlier versions of Chef the LWRP DSL doesn't support specifying
 # a default action, so you need to drop into Ruby.
@@ -47,6 +48,11 @@ attribute :endpoint_publicurl, kind_of: String
 
 # Used by both :create_tenant and :create_user
 attribute :tenant_name, kind_of: String
+
+# DO-101. domain specific attributes
+attribute :domain_name, kind_of: String
+attribute :domain_description, kind_of: String
+attribute :domain_id, kind_of: String
 
 # :create_tenant specific attributes
 attribute :tenant_description, kind_of: String

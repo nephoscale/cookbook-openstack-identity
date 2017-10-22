@@ -20,6 +20,7 @@
 #
 
 require 'uri'
+require 'mkmf'
 
 class ::Chef::Recipe # rubocop:disable Documentation
   include ::Openstack
@@ -54,6 +55,8 @@ end.flatten.uniq.each do |tenant_name| # rubocop: disable MultilineBlockChain
     bootstrap_token bootstrap_token
     tenant_name tenant_name
     tenant_description "#{tenant_name} Tenant"
+    # DO-101. domain_name is used in case auth version is v3. otherwise it is skipped.
+    domain_name "#{node['openstack']['identity']['identity']['default_domain_id']}"
 
     action :create_tenant
   end
@@ -101,6 +104,79 @@ node['openstack']['identity']['users'].each do |username, user_info|
     end
   end
 end
+
+# DO-101
+# a few things to do for keystone v3
+# Firstly, we need to assign admin role in default domain for admin account
+#
+# Secondly, _member_ role is not being created automatically with keystone v3
+# https://bugs.launchpad.net/openstack-ansible/+bug/1474916
+# to fix this we create _member_ role
+# then we assign _member_ role to all users in service project
+if node['openstack']['api']['auth']['version'] == 'v3.0' and !find_executable('openstack').nil?
+  default_domain_name = node['openstack']['identity']['identity']['default_domain_name']
+  admin_user = node['openstack']['identity']['admin_user']
+
+  openstack_identity_register "Grant admin Role to '#{admin_user}' User in '#{default_domain_name}' Domain" do
+    auth_uri auth_uri
+    bootstrap_token bootstrap_token
+    user_name admin_user
+    role_name 'admin'
+    domain_name default_domain_name
+    action :grant_role
+  end
+
+  rolename = node['openstack']['identity']['member_role_name']
+
+  openstack_identity_register "Register '#{rolename}' Role" do
+    auth_uri auth_uri
+    bootstrap_token bootstrap_token
+    role_name rolename
+
+    action :create_role
+  end
+
+  begin
+
+    project = 'service'
+    env = {
+        'OS_URL'    => auth_uri,
+        'OS_TOKEN'  => bootstrap_token,
+        'OS_IDENTITY_API_VERSION' => '3'
+    }
+
+    users = prettytable_to_array(openstack_command('openstack', "user list --project #{project}", env))
+
+    # assign _member role to service users
+    users.each do |user|
+      openstack_identity_register "Grant '#{rolename}' Role to '#{user['Name']}' User in '#{project}' Tenant" do
+        auth_uri auth_uri
+        bootstrap_token bootstrap_token
+        user_name user['Name']
+        role_name rolename
+        tenant_name project
+
+        action :grant_role
+      end
+    end
+
+    # assign _member role to admin account
+    project = node['openstack']['identity']['admin_tenant_name']
+    openstack_identity_register "Grant '#{rolename}' Role to '#{node['openstack']['identity']['admin_user']}' User in '#{project}' Tenant" do
+      auth_uri auth_uri
+      bootstrap_token bootstrap_token
+      user_name node['openstack']['identity']['admin_user']
+      role_name rolename
+      tenant_name project
+
+      action :grant_role
+    end
+  rescue RuntimeError => e
+    Chef::Log.info("Could not get the list of users in project #{project}. Error: #{e.message}")
+  end
+end
+#
+
 
 openstack_identity_register 'Register Identity Service' do
   auth_uri auth_uri

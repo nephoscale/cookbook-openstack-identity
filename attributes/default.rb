@@ -416,7 +416,7 @@ when 'debian'
   default['openstack']['identity']['platform'] = {
     'memcache_python_packages' => ['python-memcache'],
     'keystone_packages' => ['keystone'],
-    'keystone_client_packages' => ['python-keystoneclient'],
+    'keystone_client_packages' => ['python-openstackclient', 'python-keystoneclient'],
     'keystone_service' => 'keystone',
     'keystone_process_name' => 'keystone-all',
     'keystone_wsgi_file' => '/usr/share/keystone/wsgi.py',
